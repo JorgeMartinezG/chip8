@@ -7,24 +7,6 @@ pub struct Chip8 {
 	cpu: Cpu
 }
 
-struct Decoded {
-	nnn: u16,
-	nn: u8,
-	n: u8,
-	x: u8,
-	y: u8
-}
-
-fn decode_instruction(instruction: u16) -> Decoded {
-	Decoded {
-	    nnn: instruction & 0x0FFF;
-        nn: (instruction & 0x0FF) as u8;
-        n: (instruction & 0x00F) as u8;
-        x: ((instruction & 0x0F00) >> 8) as u8;
-		y: ((instruction & 0x00F0) >> 4) as u8;
-	}
-}
-
 
 impl Chip8 {
 	pub fn new() -> Chip8 {
@@ -45,7 +27,10 @@ impl Chip8 {
 
 	pub fn run_instruction(&mut self) {
 		let instruction = self.cpu.fetch_instruction(&self.ram);
-		let decoded = decode_instruction(instruction);
+		let decoded = self.cpu.decode_instruction(instruction);
+
+		self.cpu.execute_instruction(&mut self.ram, instruction, decoded);
+		println!("Cpu state: {:?}", self.cpu);
 	}
 
 
