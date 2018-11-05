@@ -1,5 +1,6 @@
 use ram::Ram;
 use std::fmt;
+use keyboard::Keyboard;
 
 pub const PROGRAM_START_ADDRESS: u16 = 0x200;
 
@@ -7,12 +8,12 @@ pub struct Cpu {
     vx: [u8; 16],
     pc: u16,
     i: u16,
-    stack: [u16; 16],
+    stack: Vec<u16>,
     sp: u8,
 }
 
 pub struct Decode {
-    nnn: u16,
+    pub nnn: u16,
     nn: u8,
     n: u8,
     x: u8,
@@ -25,7 +26,7 @@ impl Cpu {
             vx: [0; 16],
             pc: PROGRAM_START_ADDRESS,
             i: 0,
-            stack: [0; 16],
+            stack: Vec::<u16>::new(),
             sp:0
 		}
 	}
@@ -73,7 +74,7 @@ impl Cpu {
     }
 
 
-    pub fn execute_instruction(&mut self, ram: &mut Ram, instruction: u16, decode: Decode) {
+    pub fn execute_instruction(&mut self, ram: &mut Ram, instruction: u16, decode: Decode, keyboard: &Keyboard) {
         match (instruction & 0xF000) >> 12 {
             0x0 => {
                 match decode.nn {
@@ -82,12 +83,8 @@ impl Cpu {
                     //     self.pc += 2;
                     // }
                     0xEE => {
-                        //return from subroutine
-                        if self.sp > 0 {
-                            self.sp -= 1;
-                        }
-
-                        self.pc = self.stack[self.sp as usize];
+                        let addr = self.stack.pop().unwrap();
+                        self.pc = addr;
                     }
                     _ => panic!(
                         "Unrecognized 0x00** instruction {:#X}:{:#X}",
@@ -101,7 +98,7 @@ impl Cpu {
                 self.pc = decode.nnn;
             }
             0x2 => {
-                self.stack[(self.sp + 2) as usize] = self.pc;
+                self.stack.push(self.pc + 2);
                 self.pc = decode.nnn;
             }
             0x3 => {
@@ -131,7 +128,7 @@ impl Cpu {
             },
             0x7 => {
                 let vx = self.read_vx(decode.x);
-                self.write_vx(decode.x, vx.wrapping_add(decode.nn));
+                self.write_vx(decode.x, vx + decode.nn);
                 self.pc += 2;
             }
             0x8 => {
@@ -209,33 +206,25 @@ impl Cpu {
                 self.draw_sprite(ram, decode.x, decode.y, decode.n);
                 self.pc += 2;
             }
-            // 0xE => {
-            //     match nn {
-            //         0xA1 => {
-            //             // if(key()!=Vx) then skip the next instruction
-            //             let key = self.read_reg_vx(x);
-            //             if !bus.is_key_pressed(key) {
-            //                 self.pc += 4;
-            //             } else {
-            //                 self.pc += 2;
-            //             }
-            //         }
-            //         0x9E => {
-            //             // if(key()==Vx) then skip the next instruction
-            //             let key = self.read_reg_vx(x);
-            //             if bus.is_key_pressed(key) {
-            //                 self.pc += 4;
-            //             } else {
-            //                 self.pc += 2;
-            //             }
-            //         }
-            //         _ => panic!(
-            //             "Unrecognized 0xEX** instruction {:#X}:{:#X}",
-            //             self.pc,
-            //             instruction
-            //         ),
-            //     };
-            // }
+            0xE => {
+                match decode.nn {
+                    0xA1 => {
+                        // if(key()!=Vx) then skip the next instruction
+                        let key = self.read_vx(decode.x);
+                        self.pc += if !keyboard.is_key_pressed(key) {4} else {2}
+                    }
+                    0x9E => {
+                        // if(key()==Vx) then skip the next instruction
+                        let key = self.read_vx(decode.x);
+                        self.pc += if keyboard.is_key_pressed(key) {4} else {2}
+                    }
+                    _ => panic!(
+                        "Unrecognized 0xEX** instruction {:#X}:{:#X}",
+                        self.pc,
+                        instruction
+                    ),
+                };
+            }
             0xF => {
                 match decode.nn {
                     // 0x07 => {
@@ -280,10 +269,10 @@ impl Cpu {
                             let value = ram.read_byte(self.i + index as u16);
                             self.write_vx(index, value);
                         }
-                        //self.i += x as u16 + 1;
+                        self.i += decode.x as u16 + 1;
                         self.pc += 2;
                     }
-                    _ => panic!("Unrecognized instruction {:#X}:{:#X}", self.pc, instruction)                    
+                    _ => panic!("Unrecognized instruction 0xF** {:#X}:{:#X}", self.pc, instruction)                    
                 }
 
 

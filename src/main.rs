@@ -6,6 +6,7 @@ use chip8::Chip8;
 mod ram;
 mod chip8;
 mod cpu;
+mod keyboard;
 
 
 fn main() {

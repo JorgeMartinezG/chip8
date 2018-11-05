@@ -1,10 +1,12 @@
 use ram::Ram;
 use cpu;
 use cpu::Cpu;
+use keyboard::Keyboard;
 
 pub struct Chip8 {
 	ram: Ram,
-	cpu: Cpu
+	cpu: Cpu,
+    keyboard: Keyboard
 }
 
 
@@ -12,7 +14,8 @@ impl Chip8 {
 	pub fn new() -> Chip8 {
 		let mut chp8 = Chip8 {
 			ram: Ram::new(),
-			cpu: Cpu::new()
+			cpu: Cpu::new(),
+            keyboard: Keyboard::new()
 		};
 		chp8.load_sprites();
 
@@ -29,7 +32,7 @@ impl Chip8 {
 		let instruction = self.cpu.fetch_instruction(&self.ram);
 		let decoded = self.cpu.decode_instruction(instruction);
 
-		self.cpu.execute_instruction(&mut self.ram, instruction, decoded);
+		self.cpu.execute_instruction(&mut self.ram, instruction, decoded, &self.keyboard);
 		println!("Cpu state: {:?}", self.cpu);
 	}
 
