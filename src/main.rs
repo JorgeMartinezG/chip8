@@ -64,9 +64,24 @@ fn main() {
 	});
 
 	while window.is_open() && !window.is_key_down(Key::Escape) {
-		chip8.run_instruction();        
-		let chip8_buffer = chip8.get_display_buffer();
 
+ 		let keys_pressed = window.get_keys_pressed(KeyRepeat::Yes);
+
+        let key = match keys_pressed {
+            Some(keys) => if !keys.is_empty() {
+                Some(keys[0])
+            } else {
+                None
+            },
+            None => None,
+        };
+
+		let chip8_key = get_chip8_keycode_for(key);
+		println!{"Key pressed!!!!! --> {:?}", Some(chip8_key)};
+		chip8.set_key_pressed(chip8_key);
+
+		chip8.run_instruction();
+		let chip8_buffer = chip8.get_display_buffer();
         for y in 0..height {
             let y_coord = y / 10;
             let offset = y * width;

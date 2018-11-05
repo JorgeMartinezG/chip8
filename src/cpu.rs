@@ -12,7 +12,6 @@ pub struct Cpu {
     pc: u16,
     i: u16,
     stack: Vec<u16>,
-    stack_pointer: u8,
     delay_timer: u8
 }
 
@@ -31,7 +30,6 @@ impl Cpu {
             pc: PROGRAM_START_ADDRESS,
             i: 0,
             stack: Vec::<u16>::new(),
-            stack_pointer: 0,
             delay_timer: 0
 		}
 	}
@@ -60,6 +58,12 @@ impl Cpu {
             x: ((instruction & 0x0F00) >> 8) as u8,
             y: ((instruction & 0x00F0) >> 4) as u8,
         }        
+    }
+
+    pub fn decrement_timer(&mut self) {
+        if self.delay_timer > 0 {
+            self.delay_timer -= 1;
+        }
     }
 
     fn draw_sprite(&mut self, ram: &mut Ram, x: u8, y: u8, height: u8, display: &mut Display) {
@@ -157,11 +161,8 @@ impl Cpu {
                     0x5 => {
                         let diff: i8 = vx as i8 - vy as i8;
                         self.write_vx(decode.x, diff as u8);
-                        if diff < 0 {
-                            self.write_vx(0xF, 1);
-                        } else {
-                            self.write_vx(0xF, 0);
-                        }
+                        let val = if diff < 0 {1} else {0};
+                        self.write_vx(0xF, val);
                     }
                     0x6 => {
                         // Vx=Vx>>1
@@ -171,11 +172,8 @@ impl Cpu {
                     0x7 => {
                         let diff: i8 = vy as i8 - vx as i8;
                         self.write_vx(decode.x, diff as u8);
-                        if diff < 0 {
-                            self.write_vx(0xF, 1);
-                        } else {
-                            self.write_vx(0xF, 0);
-                        }
+                        let val = if diff < 0 {1} else {0};
+                        self.write_vx(0xF, val);
                     }
                     0xE => {
                         // VF is the most significant bit value.
@@ -246,6 +244,7 @@ impl Cpu {
                 match decode.nn {
                     0x07 => {
                         let delay_timer = self.delay_timer;
+                        println!("Delay timer -> {:}", delay_timer);
                         self.write_vx(decode.x, delay_timer);
                         self.pc += 2;
                     }
@@ -282,7 +281,15 @@ impl Cpu {
                         ram.write_byte(self.i + 2, vx % 10);
 
                         self.pc += 2;
-                    },
+                    }
+                    0x55 => {
+                        for index in 0..decode.x + 1 {
+                            let value = self.read_vx(index);
+                            ram.write_byte(self.i + index as u16, value);
+                        }
+                        self.i += decode.x as u16 + 1;
+                        self.pc += 2;
+                    }
                     0x65 => {
                         for index in 0..decode.x + 1 {
                             let value = ram.read_byte(self.i + index as u16);

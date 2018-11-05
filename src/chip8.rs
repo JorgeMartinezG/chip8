@@ -37,6 +37,8 @@ impl Chip8 {
 	}
 
 	pub fn run_instruction(&mut self) {
+		self.cpu.decrement_timer();
+
 		let instruction = self.cpu.fetch_instruction(&self.ram);
 		let decoded = self.cpu.decode_instruction(instruction);
 
@@ -44,6 +46,10 @@ impl Chip8 {
 		println!("Cpu state: {:?}", self.cpu);
 	}
 
+    pub fn set_key_pressed(&mut self, key: Option<u8>) {
+		println!{"Key pressed!!!!! --> {:?}", Some(key)};
+        self.keyboard.set_key_pressed(key);
+	}
 
 	fn load_sprites(&mut self) {
         //Initialize memory with the predefined sprites from 0, 1, 2 ... F
