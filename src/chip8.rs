@@ -1,11 +1,13 @@
 use ram::Ram;
 use cpu;
 use cpu::Cpu;
+use display::Display;
 use keyboard::Keyboard;
 
 pub struct Chip8 {
 	ram: Ram,
 	cpu: Cpu,
+    display: Display,
     keyboard: Keyboard
 }
 
@@ -15,12 +17,18 @@ impl Chip8 {
 		let mut chp8 = Chip8 {
 			ram: Ram::new(),
 			cpu: Cpu::new(),
+            display: Display::new(),
             keyboard: Keyboard::new()
 		};
 		chp8.load_sprites();
 
 		chp8
 	}
+
+    pub fn get_display_buffer(&self) -> &[u8] {
+        &self.display.get_buffer()
+    }
+
 
 	pub fn load_rom(&mut self, data: &[u8]) {
 		for index in 0..data.len() {
@@ -32,7 +40,7 @@ impl Chip8 {
 		let instruction = self.cpu.fetch_instruction(&self.ram);
 		let decoded = self.cpu.decode_instruction(instruction);
 
-		self.cpu.execute_instruction(&mut self.ram, instruction, decoded, &self.keyboard);
+		self.cpu.execute_instruction(&mut self.ram, instruction, decoded, &self.keyboard, &mut self.display);
 		println!("Cpu state: {:?}", self.cpu);
 	}
 

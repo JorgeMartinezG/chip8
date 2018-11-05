@@ -1,3 +1,4 @@
+use display::Display;
 use keyboard::Keyboard;
 use ram::Ram;
 use rand;
@@ -61,31 +62,28 @@ impl Cpu {
         }        
     }
 
-    pub fn draw_sprite(&self, ram:&Ram, x:u8, y:u8, n:u8) {
-        for j in 0..n {
-            let mut b = ram.read_byte(self.i + (j as u16));
-            for _ in 0..8 {
-                match (b & 0b1000_0000) >> 7 {
-                    0 => print!("_"),
-                    1 => print!("#"),
-                    _ => unreachable!()
-                }
-                b = b << 1;
+    fn draw_sprite(&mut self, ram: &mut Ram, x: u8, y: u8, height: u8, display: &mut Display) {
+        let mut vf_val = 0;
+
+        for sprite_y in 0..height {
+            let b = ram.read_byte(self.i + sprite_y as u16);
+            if display.draw_byte(b, x, y + sprite_y) {
+                vf_val = 1;
             }
-            print!("\n");
         }
+
+        self.write_vx(0xF, vf_val);
 
     }
 
-
-    pub fn execute_instruction(&mut self, ram: &mut Ram, instruction: u16, decode: Decode, keyboard: &Keyboard) {
+    pub fn execute_instruction(&mut self, ram: &mut Ram, instruction: u16, decode: Decode, keyboard: &Keyboard, display: &mut Display) {
         match (instruction & 0xF000) >> 12 {
             0x0 => {
                 match decode.nn {
-                    // 0xE0 => {
-                    //     bus.clear_screen();
-                    //     self.pc += 2;
-                    // }
+                    0xE0 => {
+                        display.clear();
+                        self.pc += 2;
+                    }
                     0xEE => {
                         let addr = self.stack.pop().unwrap();
                         self.pc = addr;
@@ -119,11 +117,7 @@ impl Cpu {
                 //Skip next instruction if(Vx==Vy)
                 let vx = self.read_vx(decode.x);
                 let vy = self.read_vx(decode.y);
-                if vx == vy {
-                    self.pc += 4;
-                } else {
-                    self.pc += 2;
-                }
+                self.pc += if vx == vy {4} else {2}
             }
             0x6 => {
                 //vx = nn
@@ -132,7 +126,7 @@ impl Cpu {
             },
             0x7 => {
                 let vx = self.read_vx(decode.x);
-                self.write_vx(decode.x, vx + decode.nn);
+                self.write_vx(decode.x, vx.wrapping_add(decode.nn));
                 self.pc += 2;
             }
             0x8 => {
@@ -223,7 +217,10 @@ impl Cpu {
             0xD => {
                 // Draw sprite
                 //draw(Vx,Vy,N)
-                self.draw_sprite(ram, decode.x, decode.y, decode.n);
+                let vx = self.read_vx(decode.x);
+                let vy = self.read_vx(decode.y);
+
+                self.draw_sprite(ram, vx, vy, decode.n, display);
                 self.pc += 2;
             }
             0xE => {
@@ -252,12 +249,12 @@ impl Cpu {
                         self.write_vx(decode.x, delay_timer);
                         self.pc += 2;
                     }
-                    // 0x0A => {
-                    //     if let Some(val) = bus.get_key_pressed() {
-                    //         self.write_reg_vx(x, val);
-                    //         self.pc += 2;
-                    //     }
-                    // }
+                    0x0A => {
+                        if let Some(val) = keyboard.get_key_pressed() {
+                            self.write_vx(decode.x, val);
+                            self.pc += 2;
+                        }
+                    }
                     0x15 => {
                         let vx = self.read_vx(decode.x);
                         self.set_delay_timer(vx);
@@ -315,11 +312,6 @@ impl Cpu {
     pub fn set_delay_timer(&mut self, val: u8) {
         self.delay_timer = val;
     }
-
-    pub fn get_delay_timer(&self) -> u8 {
-        self.delay_timer
-    }
-
 }
 
 impl fmt::Debug for Cpu {
