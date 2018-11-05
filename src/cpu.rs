@@ -1,6 +1,8 @@
-use ram::Ram;
-use std::fmt;
 use keyboard::Keyboard;
+use ram::Ram;
+use rand;
+use rand::distributions::{IndependentSample, Range};
+use std::fmt;
 
 pub const PROGRAM_START_ADDRESS: u16 = 0x200;
 
@@ -9,11 +11,12 @@ pub struct Cpu {
     pc: u16,
     i: u16,
     stack: Vec<u16>,
-    sp: u8,
+    stack_pointer: u8,
+    delay_timer: u8
 }
 
 pub struct Decode {
-    pub nnn: u16,
+    nnn: u16,
     nn: u8,
     n: u8,
     x: u8,
@@ -27,7 +30,8 @@ impl Cpu {
             pc: PROGRAM_START_ADDRESS,
             i: 0,
             stack: Vec::<u16>::new(),
-            sp:0
+            stack_pointer: 0,
+            delay_timer: 0
 		}
 	}
 
@@ -195,11 +199,27 @@ impl Cpu {
                 self.pc += 2;
 
             }
+            0x9 => {
+                let vx = self.read_vx(decode.x);
+                let vy = self.read_vx(decode.y);
+                self.pc += if vx != vy {4} else {2}
+            }
             0xA => {
                 // i = NNN
                 self.i = decode.nnn;
                 self.pc += 2;
-            },
+            }
+            0xB => {
+                self.pc = self.read_vx(0) as u16 + decode.nnn;
+            }
+            0xC => {
+                // Vx=rand() & NN
+                let interval = Range::new(0, 255);
+                let number = interval.ind_sample(&mut rand::thread_rng());
+                self.write_vx(decode.x, number & decode.nn);
+                self.pc += 2;
+
+            }
             0xD => {
                 // Draw sprite
                 //draw(Vx,Vy,N)
@@ -227,20 +247,22 @@ impl Cpu {
             }
             0xF => {
                 match decode.nn {
-                    // 0x07 => {
-                    //     self.write_reg_vx(x, bus.get_delay_timer());
-                    //     self.pc += 2;
-                    // }
+                    0x07 => {
+                        let delay_timer = self.delay_timer;
+                        self.write_vx(decode.x, delay_timer);
+                        self.pc += 2;
+                    }
                     // 0x0A => {
                     //     if let Some(val) = bus.get_key_pressed() {
                     //         self.write_reg_vx(x, val);
                     //         self.pc += 2;
                     //     }
                     // }
-                    // 0x15 => {
-                    //     bus.set_delay_timer(self.read_reg_vx(x));
-                    //     self.pc += 2;
-                    // }
+                    0x15 => {
+                        let vx = self.read_vx(decode.x);
+                        self.set_delay_timer(vx);
+                        self.pc += 2;
+                    }
                     0x18 => {
                         // TODO Sound timer
                         self.pc += 2;
@@ -282,12 +304,20 @@ impl Cpu {
         }
     }
 
-    pub fn read_vx(&self, idx:u8) -> u8{
+    pub fn read_vx(&self, idx: u8) -> u8{
         self.vx[idx as usize]
     }
 
-    pub fn write_vx(&mut self, idx:u8, nn:u8) {
+    pub fn write_vx(&mut self, idx: u8, nn: u8) {
         self.vx[idx as usize] = nn;
+    }
+
+    pub fn set_delay_timer(&mut self, val: u8) {
+        self.delay_timer = val;
+    }
+
+    pub fn get_delay_timer(&self) -> u8 {
+        self.delay_timer
     }
 
 }
